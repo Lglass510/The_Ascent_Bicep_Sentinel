@@ -1,0 +1,3 @@
+# Bicep build output and local scratch
+*.json.tmp
+.azure/
