@@ -39,3 +39,13 @@ resource watchlist 'Microsoft.SecurityInsights/watchlists@2025-09-01' = {
 
   }
 }
+
+module privEscRule './modules/analyticsRule.bicep' = {
+  name: 'privEscRule'
+  params: {
+    workspaceName: lawName
+  }
+  dependsOn: [
+    sentinel
+  ]
+}

@@ -1,0 +1,47 @@
+// T1098.003 - Account Manipulation: Additional Cloud Roles
+// Sentinel scheduled rule: "Privilege Escalation - Entra Role Assignment"
+// Workspace: law-defenderlab | Severity: High | Runs every 15 min, 30 min lookback
+// Exported from the deployed analytics rule on 2026-09-30.
+//
+// Tuning notes:
+// - Only fires on high-impact roles, so routine role changes don't create incidents.
+// - Covers direct assignments and PIM eligible/permanent assignment operations.
+// - Uses userPrincipalName and object IDs, not displayName, because Entra often
+//   leaves displayName null in InitiatedBy/TargetResources.
+//
+// Entity mapping (Account):
+// - AadUserId <- TargetResourceId  (object ID GUID; the playbook disables by this value)
+// - TargetUser (UPN) is kept for readability
+AuditLogs
+| where OperationName in (
+    "Add member to role",
+    "Add eligible member to role",
+    "Add member to role in PIM requested (permanent)",
+    "Add member to role completed (permanent)"
+)
+| extend InitiatedByUser  = tostring(InitiatedBy.user.userPrincipalName)
+| extend InitiatedByIP    = tostring(InitiatedBy.user.ipAddress)
+| extend TargetUser       = tostring(TargetResources[0].userPrincipalName)
+| extend TargetResourceId = tostring(TargetResources[0].id)
+| mv-expand ModifiedProps = TargetResources[0].modifiedProperties
+| extend PropertyName = tostring(ModifiedProps.displayName)
+| extend RoleAssigned  = tostring(ModifiedProps.newValue)
+| where PropertyName == "Role.DisplayName"
+| where RoleAssigned has_any (
+    "Global Administrator",
+    "Privileged Role Administrator",
+    "Security Administrator",
+    "Application Administrator",
+    "Cloud Application Administrator"
+)
+| project
+    TimeGenerated,
+    OperationName,
+    InitiatedByUser,
+    InitiatedByIP,
+    TargetUser,
+    TargetResourceId,
+    RoleAssigned,
+    Result,
+    CorrelationId
+| order by TimeGenerated desc
