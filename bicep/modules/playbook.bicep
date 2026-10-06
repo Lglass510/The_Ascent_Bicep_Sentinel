@@ -11,9 +11,11 @@ var sentinelApiId = subscriptionResourceId('Microsoft.Web/locations/managedApis'
 resource sentinelConnection 'Microsoft.Web/connections@2016-06-01' = {
   name: 'microsoftsentinel-${playbookName}'
   location: location
+  #disable-next-line BCP187
   kind: 'V1'
   properties: {
     displayName: 'microsoftsentinel-${playbookName}'
+    #disable-next-line BCP187
     parameterValueType: 'Alternative'
     api: {
       id: sentinelApiId
