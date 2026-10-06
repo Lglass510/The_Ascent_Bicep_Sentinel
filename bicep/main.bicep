@@ -49,3 +49,13 @@ module privEscRule './modules/analyticsRule.bicep' = {
     sentinel
   ]
 }
+module playbook 'modules/playbook.bicep' = {
+  name: 'playbook'
+  params: {
+    workspaceName: law.name
+    location: location
+  }
+  dependsOn: [
+    sentinel
+  ]
+}

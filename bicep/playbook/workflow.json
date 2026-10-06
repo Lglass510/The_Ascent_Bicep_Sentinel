@@ -1,0 +1,191 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "workspaceId": {
+      "defaultValue": "",
+      "type": "String"
+    }
+  },
+  "triggers": {
+    "Microsoft_Sentinel_incident": {
+      "type": "ApiConnectionWebhook",
+      "inputs": {
+        "body": {
+          "callback_url": "@{listCallbackUrl()}"
+        },
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['microsoftsentinel']['connectionId']"
+          }
+        },
+        "path": "/incident-creation"
+      }
+    }
+  },
+  "actions": {
+    "Entities_-_Get_Accounts": {
+      "runAfter": {},
+      "type": "ApiConnection",
+      "inputs": {
+        "body": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['microsoftsentinel']['connectionId']"
+          }
+        },
+        "method": "post",
+        "path": "/entities/account"
+      }
+    },
+    "For_each": {
+      "foreach": "@body('Entities_-_Get_Accounts')?['Accounts']",
+      "actions": {
+        "Protected_Account": {
+          "actions": {
+            "Add_comment_-_protected_account": {
+              "type": "ApiConnection",
+              "inputs": {
+                "body": {
+                  "incidentArmId": "@triggerBody()?['object']?['id']",
+                  "message": "<p>Protected account on the AutomationExclusions watchlist. Playbook did NOT disable it. Human review required: @{items('For_each')?['Name']}</p>"
+                },
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['microsoftsentinel']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/Incidents/Comment"
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "Update_user_-_disable_user": {
+                "runAfter": {},
+                "type": "Http",
+                "inputs": {
+                  "authentication": {
+                    "audience": "https://graph.microsoft.com/",
+                    "type": "ManagedServiceIdentity"
+                  },
+                  "body": {
+                    "accountEnabled": false
+                  },
+                  "method": "PATCH",
+                  "uri": "https://graph.microsoft.com/v1.0/users/@{item()?['aadUserId']}"
+                }
+              },
+              "Condition": {
+                "actions": {
+                  "Add_comment_to_incident_(V3)": {
+                    "runAfter": {
+                      "Current_time": [
+                        "Succeeded"
+                      ]
+                    },
+                    "type": "ApiConnection",
+                    "inputs": {
+                      "body": {
+                        "incidentArmId": "@triggerBody()?['object']?['id']",
+                        "message": "<p>Account @{items('For_each')?['Name']} automatically disabled by playbook at @{body('Current_time')}</p>"
+                      },
+                      "host": {
+                        "connection": {
+                          "name": "@parameters('$connections')['microsoftsentinel']['connectionId']"
+                        }
+                      },
+                      "method": "post",
+                      "path": "/Incidents/Comment"
+                    }
+                  },
+                  "Current_time": {
+                    "type": "Expression",
+                    "kind": "CurrentTime",
+                    "inputs": {}
+                  }
+                },
+                "runAfter": {
+                  "Update_user_-_disable_user": [
+                    "Succeeded",
+                    "Failed"
+                  ]
+                },
+                "else": {
+                  "actions": {
+                    "Add_comment_to_incident_-_error_details": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "body": {
+                          "incidentArmId": "@triggerBody()?['object']?['id']",
+                          "message": "<p>Playbook could not disable user @{items('For_each')?['Name']}.<br>Error message: @{body('Update_user_-_disable_user')?['error']?['message']}<br>Some admin roles need a higher-privileged Entra role to disable. Review manually.</p>"
+                        },
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['microsoftsentinel']['connectionId']"
+                          }
+                        },
+                        "method": "post",
+                        "path": "/Incidents/Comment"
+                      }
+                    }
+                  }
+                },
+                "expression": {
+                  "and": [
+                    {
+                      "equals": [
+                        "@body('Update_user_-_disable_user')",
+                        "@null"
+                      ]
+                    }
+                  ]
+                },
+                "type": "If"
+              }
+            }
+          },
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@contains(toLower(string(body('Get_Protected_Accounts'))), toLower(string(items('For_each')?['aadUserId'])))",
+                  "@true"
+                ]
+              }
+            ]
+          },
+          "type": "If"
+        }
+      },
+      "runAfter": {
+        "Get_Protected_Accounts": [
+          "Succeeded"
+        ]
+      },
+      "type": "Foreach"
+    },
+    "Get_Protected_Accounts": {
+      "runAfter": {
+        "Entities_-_Get_Accounts": [
+          "Succeeded"
+        ]
+      },
+      "type": "Http",
+      "inputs": {
+        "authentication": {
+          "audience": "https://management.azure.com/",
+          "type": "ManagedServiceIdentity"
+        },
+        "method": "GET",
+                "uri": "https://management.azure.com@{parameters('workspaceId')}/providers/Microsoft.SecurityInsights/watchlists/AutomationExclusions/watchlistItems?api-version=2024-03-01"
+
+      }
+    }
+  }
+}
