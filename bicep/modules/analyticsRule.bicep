@@ -51,3 +51,4 @@ resource privEscRule 'Microsoft.SecurityInsights/alertRules@2025-09-01' = {
     }
   }
 }
+output ruleId string = privEscRule.id

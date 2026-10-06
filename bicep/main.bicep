@@ -1,6 +1,6 @@
 param lawName string 
 param location string = resourceGroup().location
-
+param sentinelSpObjectId string
 resource law 'Microsoft.OperationalInsights/workspaces@2026-03-01' = { 
 name: lawName
 location:location
@@ -57,5 +57,24 @@ module playbook 'modules/playbook.bicep' = {
   }
   dependsOn: [
     sentinel
+  ]
+}
+module rbac 'modules/rbac.bicep' = {
+  name: 'rbac'
+  params: {
+    workspaceName: law.name
+    playbookPrincipalId: playbook.outputs.principalId
+    sentinelSpObjectId: sentinelSpObjectId
+  }
+}
+module automationRule 'modules/automationRule.bicep' = {
+  name: 'automationRule'
+  params: {
+    workspaceName: law.name
+    analyticsRuleId: privEscRule.outputs.ruleId
+    playbookId: playbook.outputs.playbookId
+  }
+  dependsOn: [
+    rbac
   ]
 }

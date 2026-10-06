@@ -54,3 +54,4 @@ workspaceId: {
   }
 }
 output principalId string = playbook.identity.principalId
+output playbookId string = playbook.id
