@@ -1,6 +1,6 @@
 // T1098.003 - Account Manipulation: Additional Cloud Roles
 // Sentinel scheduled rule: "Privilege Escalation - Entra Role Assignment"
-// Workspace: law-defenderlab | Severity: High | Runs every 15 min, 30 min lookback
+// Workspace: workspaceId | Severity: High | Runs every 15 min, 30 min lookback
 // Exported from the deployed analytics rule on 2026-09-30.
 //
 // Tuning notes:

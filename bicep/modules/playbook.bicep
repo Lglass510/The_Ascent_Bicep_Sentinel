@@ -15,7 +15,7 @@ resource sentinelConnection 'Microsoft.Web/connections@2016-06-01' = {
   kind: 'V1'
   properties: {
     displayName: 'microsoftsentinel-${playbookName}'
-    #disable-next-line BCP187
+    #disable-next-line BCP037
     parameterValueType: 'Alternative'
     api: {
       id: sentinelApiId
