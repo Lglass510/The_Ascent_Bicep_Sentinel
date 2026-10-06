@@ -7,7 +7,7 @@
 #>
 param(
     [string]$ResourceGroupName = "rg-ascent-ward",
-    [string]$WorkspaceName     = "law-ascent-ward"
+    [string]$WorkspaceName     = "law-ascent-ward2"
 )
 
 $ErrorActionPreference = 'Stop'
