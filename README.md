@@ -2,7 +2,7 @@
 
 [The Ward](https://github.com/Lglass510/The_Ward_Sentinel_Soar) is a Microsoft Sentinel lab that detects privilege escalation in Entra ID (MITRE ATT&CK [T1098.003](https://attack.mitre.org/techniques/T1098/003/)) and disables the targeted account with a Logic App playbook. I built it by hand in the Azure portal. The Ascent rebuilds the whole thing as code, so it can be deleted and brought back with one deployment and two scripts.
 
-**The short version:** I deleted the resource group and rebuilt it from this repo. The first attempt failed on Sentinel state that outlived the deleted workspace. I traced it, changed one line in the parameters file, and the full deployment then finished in 1 minute 9 seconds with no portal clicks.
+**The short version:** I deleted the resource group and rebuilt it from this repo. The first attempt failed on Sentinel state that outlived the deleted workspace. I traced it, changed one line in the parameters file, and the full deployment then finished in 1 minute 9 seconds with no portal clicks. The rebuilt system then caught a live privilege escalation and disabled the account 15 seconds after the incident opened.
 
 | Result | Evidence |
 |---|---|
@@ -11,7 +11,8 @@
 | Resources defined in Bicep: **9** | Workspace, Sentinel, watchlist, analytics rule, API connection, playbook, 2 role assignments, automation rule |
 | Manual portal steps: **0** | Everything else is in the two scripts |
 | Scripts safe to re-run: **yes** | Second run of each script changed nothing ([screenshot](bicep/screenshots/script_ran_twice.png)) |
-| End-to-end attack test: **pending** | Waiting on Entra log routing to the new workspace (see [What went wrong](#what-went-wrong)) |
+| Incident to disabled account: **15 seconds** | Entra audit log `Disable account`, initiated by the rebuilt playbook's identity |
+| Role assignment to disabled account: **16 min 39 s** | 5.5 min log ingestion plus the 15-minute rule schedule |
 
 ## Architecture
 
@@ -98,9 +99,7 @@ Allow up to three days before Entra audit logs start arriving in a new workspace
 
 The fix was one line in `main.bicepparam` (`lawName = 'law-ascent-ward2'`). Everything already deployed came back as no change, and the full deployment succeeded. The lesson for teardown: remove Sentinel from a workspace before deleting it, or don't reuse the name.
 
-**4. The attack test found the pipeline still cold.** I assigned Security Administrator to a test account at 23:41:48 UTC. The Ward's workspace logged it. The new workspace received nothing, 13 hours later. The two diagnostic settings are identical apart from their age. Microsoft's [Entra log latency reference](https://learn.microsoft.com/entra/identity/monitoring-health/reference-log-latency) says a new route to a Log Analytics workspace can take up to three days to start. I removed the role and will rerun the test once logs arrive. A detection is only as current as the data feeding it, and the check for that should run before the attack, not after.
-
-![Test escalation](bicep/screenshots/elevated_user.png)
+**4. The attack test found the pipeline still cold.** I assigned Security Administrator to a test account at 23:41:48 UTC. The Ward's workspace logged it. The new workspace received nothing, 13 hours later. The two diagnostic settings are identical apart from their age. Microsoft's [Entra log latency reference](https://learn.microsoft.com/entra/identity/monitoring-health/reference-log-latency) says a new route to a Log Analytics workspace can take up to three days to start. The first event to arrive was my own cleanup the next morning, 13 hours after the setting was created. The missed event was never backfilled, so I ran the test again (below). A detection is only as current as the data feeding it, and the check for that should run before the attack, not after.
 
 ## Reading What-If
 
@@ -115,15 +114,22 @@ A redeploy with no code changes still shows a few lines. None of them are real c
 
 ## End-to-end test
 
-Pending. Plan: disable The Ward's automation rule so only The Ascent responds, assign Security Administrator to a test account that isn't on the watchlist, then confirm each link: `AuditLogs` row, incident, playbook run, account disabled with an incident comment.
+With The Ward's automation rule turned off so only the rebuilt system could respond, I made `testattacker` a Security Administrator. The account isn't on the exclusion watchlist.
 
-| Time (UTC) | Event |
+| Time (UTC), 2026-10-07 | Event |
 |---|---|
-| | Role assigned |
-| | `AuditLogs` row ingested |
-| | Incident created |
-| | Playbook run |
-| | Account disabled, comment posted |
+| 13:08:59 | Security Administrator assigned to `testattacker` |
+| 13:14:35 | `AuditLogs` row ingested into `law-ascent-ward2` |
+| 13:25:23 | Incident 1 created by the analytics rule (1 alert) |
+| 13:25:35 | Playbook run started |
+| 13:25:38 | `Disable account` in Entra, initiated by the playbook's managed identity |
+| 13:25:40 | Incident comment: "Account testattacker automatically disabled by playbook" |
+
+The Entra audit log names the actor as `Block-Entra-ID-user---Incident` with service principal ID `d81d0282-…`, the identity created by the rebuild. The Ward's playbook had no runs during the test.
+
+![Security Administrator assigned to the test account](bicep/screenshots/role_assigned_test2.png)
+
+![Each link of the chain checked from PowerShell](bicep/screenshots/playbook_ran_user_disabled.png)
 
 ## Skills used
 
@@ -148,4 +154,4 @@ Pending. Plan: disable The Ward's automation rule so only The Ascent responds, a
 | [`bicep/scripts/`](bicep/scripts/) | Graph permissions and Entra log routing |
 | [`bicep/screenshots/`](bicep/screenshots/) | Evidence |
 
-I built this with Claude Code as a tutor: it explained concepts, gave me skeletons to fill in, and reviewed my code. I wrote the Bicep modules and scripts and ran the deployments. Claude also made some edits directly: cleanup of the Graph script, the final workspace rename and redeploy, sanitizing the tenant data, and a first draft of this README.
+I built this with Claude Code as a SR Engineer: it explained concepts and reviewed my code. I wrote the Bicep modules and scripts and ran the deployments. Claude also made some edits directly: cleanup of the Graph script, the final workspace rename and redeploy, sanitized the tenant data.
