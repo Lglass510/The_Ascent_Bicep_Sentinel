@@ -1,3 +1,6 @@
 # Bicep build output and local scratch
 *.json.tmp
 .azure/
+
+# Real tenant data (copy the .sample file and fill in your own accounts)
+*.local.csv

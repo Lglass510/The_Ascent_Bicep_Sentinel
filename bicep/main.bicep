@@ -35,7 +35,7 @@ resource watchlist 'Microsoft.SecurityInsights/watchlists@2025-09-01' = {
     itemsSearchKey: 'UserObjectId'
     numberOfLinesToSkip: 0
     contentType: 'text/csv'
-    rawContent: loadTextContent('data/AutomationExclusions.csv')
+    rawContent: loadTextContent('data/AutomationExclusions.local.csv')
 
   }
 }
