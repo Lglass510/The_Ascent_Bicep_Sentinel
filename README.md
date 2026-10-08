@@ -1,3 +1,5 @@
+[← Back to The Realm](https://github.com/Lglass510)
+
 # The Ascent: The Ward, Rebuilt in Bicep
 
 [The Ward](https://github.com/Lglass510/The_Ward_Sentinel_Soar) is a Microsoft Sentinel lab that detects privilege escalation in Entra ID (MITRE ATT&CK [T1098.003](https://attack.mitre.org/techniques/T1098/003/)) and disables the targeted account with a Logic App playbook. I built it by hand in the Azure portal. The Ascent rebuilds the whole thing as code, so it can be deleted and brought back with one deployment and two scripts.
